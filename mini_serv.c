@@ -28,6 +28,12 @@ void exit_error(char *message) {
 	}
 
 	write(2, "\n", 1);
+
+	if (clients != NULL) {
+		free(clients);
+		clients = NULL;
+	}
+
 	exit(1);
 }
 
@@ -129,7 +135,7 @@ int main(int argc, char** argv) {
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(atoi(argv[1]));
-	server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);;
+	server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	memset(&(server_addr.sin_zero), '\0', 8);
 
 
