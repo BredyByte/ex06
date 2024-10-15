@@ -112,7 +112,7 @@ void handle_client_message(int client_fd) {
 int main(int argc, char** argv) {
 
 	if (argc != 2) {
-		exit_error("Wrong number of arguments\n");
+		exit_error("Wrong number of arguments");
 	}
 
 	clients = malloc(MAX_CLIENTS * sizeof(t_client));
