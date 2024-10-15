@@ -37,8 +37,7 @@ void exit_error(char *message) {
 	exit(1);
 }
 
-void broadcast_message(int sender_fd, char *message, int exclude_fd) {
-	(void)sender_fd; // ????
+void broadcast_message(char *message, int exclude_fd) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].fd != -1 && clients[i].fd != exclude_fd) {
             send(clients[i].fd, message, strlen(message), 0);
@@ -65,7 +64,7 @@ void add_client(int listening) {
 
 			char buffer[BUFFER_SIZE];
 			sprintf(buffer, "server: client %d just arrived\n", client_id);
-			broadcast_message(new_client, buffer, -1);
+			broadcast_message(buffer, -1);
 			break;
 		}
     }
@@ -76,7 +75,7 @@ void remove_client(int client_fd) {
         if (clients[i].fd == client_fd) {
             char buffer[BUFFER_SIZE];
             sprintf(buffer, "server: client %d just left\n", clients[i].id);
-            broadcast_message(client_fd, buffer, -1);
+            broadcast_message(buffer, -1);
 
             close(clients[i].fd);
             clients[i].fd = -1;
@@ -109,7 +108,7 @@ void handle_client_message(int client_fd) {
     char *line = strtok(buffer, "\n");
     while (line) {
         sprintf(message, "client %d: %s\n", client_id, line);
-        broadcast_message(client_fd, message, client_fd);
+        broadcast_message(message, client_fd);
         line = strtok(NULL, "\n");
     }
 }
