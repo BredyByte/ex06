@@ -95,17 +95,50 @@ void broadcast_msg(int sender_fd, const char *msg) {
 void send_msg(int fd) {
     char *msg;
     while (extract_message(&msgs[fd], &msg)) {
-        snprintf(intro_msg, sizeof(intro_msg), "client %d: ", ids[fd]);
+        bzero(intro_msg, 42);
+        sprintf(intro_msg, "client %d: ", ids[fd]);
         broadcast_msg(fd, intro_msg);
         broadcast_msg(fd, msg);
         free(msg);
     }
 }
 
+void add_client(int sockfd) {
+    struct sockaddr_in cli;
+    int connfd;
+    socklen_t len = sizeof(cli);
+    connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
+    if (connfd >= 0) {
+        if (connfd > max_fd) max_fd = connfd;
+        ids[connfd] = client_count++;
+        msgs[connfd] = NULL;
+        FD_SET(connfd, &all_fds);
+        bzero(intro_msg, 42);
+        sprintf(intro_msg, "server: client %d just arrived\n", ids[connfd]);
+        broadcast_msg(connfd, intro_msg);
+    }
+}
+
+void recv_message(int fd) {
+    bzero(read_buffer, 1001);
+    int read_bytes = recv(fd, read_buffer, sizeof(read_buffer) - 1, 0);
+    if (read_bytes <= 0) {
+        bzero(intro_msg, 42);
+        sprintf(intro_msg, "server: client %d just left\n", ids[fd]);
+        broadcast_msg(fd, intro_msg);
+        free(msgs[fd]);
+        FD_CLR(fd, &all_fds);
+        close(fd);
+    } else {
+        read_buffer[read_bytes] = '\0';
+        msgs[fd] = str_join(msgs[fd], read_buffer);
+        send_msg(fd);
+    }
+}
+
 int main(int argc, char **argv) {
-    int sockfd, connfd;
-    struct sockaddr_in servaddr, cli;
-    socklen_t len;
+    int sockfd;
+    struct sockaddr_in servaddr;
 
     if (argc != 2) {
         exit_error("Wrong number of arguments");
@@ -135,39 +168,15 @@ int main(int argc, char **argv) {
     while (1) {
         read_fds = write_fds = all_fds;
 
-        if (select(max_fd + 1, &read_fds, &write_fds, NULL, NULL) < 0) {
-            if (client_count == 0)
-                exit_error(NULL);
-            continue;
-        }
+        if (select(max_fd + 1, &read_fds, &write_fds, 0, 0) < 0) continue;
 
         for (int fd = 0; fd <= max_fd; fd++) {
             if (!FD_ISSET(fd, &read_fds)) continue;
 
             if (fd == sockfd) {
-                len = sizeof(cli);
-                connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
-                if (connfd >= 0) {
-                    max_fd = (connfd > max_fd) ? connfd : max_fd;
-                    ids[connfd] = client_count++;
-                    msgs[connfd] = NULL;
-                    FD_SET(connfd, &all_fds);
-                    snprintf(intro_msg, sizeof(intro_msg), "server: client %d just arrived\n", ids[connfd]);
-                    broadcast_msg(connfd, intro_msg);
-                }
+                add_client(sockfd);
             } else {
-                int read_bytes = recv(fd, read_buffer, sizeof(read_buffer) - 1, 0);
-                if (read_bytes <= 0) {
-                    snprintf(intro_msg, sizeof(intro_msg), "server: client %d just left\n", ids[fd]);
-                    broadcast_msg(fd, intro_msg);
-                    free(msgs[fd]);
-                    FD_CLR(fd, &all_fds);
-                    close(fd);
-                } else {
-                    read_buffer[read_bytes] = '\0';
-                    msgs[fd] = str_join(msgs[fd], read_buffer);
-                    send_msg(fd);
-                }
+                recv_message(fd);
             }
         }
     }
